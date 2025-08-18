@@ -1,103 +1,69 @@
 <?php
-
-require_once __DIR__ . "/../config/config.php";
-
+require_once __DIR__."/../core/config.php";
 class Router
 {
-    private static $instance = null;
-    private static $base_url = null;
-
-    /**
-     * Singleton için private constructor
-     */
-    private function __construct($config = null)
+    public static $instance = null;
+    public static function getInstance()
     {
-        if ($config === null) {
-            global $siteconfig;
-            $config = $GLOBALS['site_config']['base_url'];
-        }
-        if (self::$base_url == null) {
-            self::$base_url = $config;
-        }
-    }
-
-    /**
-     * Singleton instance'ı al
-     */
-    public static function getInstance($config = null)
-    {
-        if (self::$instance === null) {
-            self::$instance = new self($config);
+        if (self::$instance == null) {
+            self::$instance = new Router();
         }
         return self::$instance;
     }
-
-    /**
-     * Base URL'i al
-     */
-    public function getBaseUrl()
+    public function get($path, $callback)
     {
-        return self::$base_url;
+        if ($_SERVER['REQUEST_URI'] == $path) {
+            $callback();
+        } else {
+            echo "404 Not Found";
+        }
+    }
+    public static function controllers($controllerName)
+    {
+        return self::baseUrl() . "/controllers/" . htmlspecialchars(rtrim($controllerName, ".php")) . ".php";
+    }
+    public static function baseUrl()
+    {
+        return "http://" . $_SERVER['HTTP_HOST'] . "/" .$GLOBALS['app_config']['base_file_name'] ."/";
+    }
+    public static function getUrl()
+    {
+        return "http://" . $_SERVER['HTTP_HOST'] . "/" . $_SERVER["SCRIPT_NAME"];
     }
 
-    /**
-     * Assets URL'ini al
-     * @param string|null $url Asset dosya yolu (opsiyonel)
-     * @return string
-     */
-    public function assets($url = '')
+    public static function view($url, $params = [])
     {
-        return self::$base_url . "/panel/assets/" . $url;
+        $link = explode("/", $url);
+        $baseUrl = self::baseUrl();
+        if ($link[0] == "panel") {
+            unset($link[0]);
+
+            $returnLink = $baseUrl . $GLOBALS['app_config']['base_panel_folder_name'].implode("/", $link) ;
+            if (!empty($params)) {
+                $returnLink .= "?" . http_build_query($params);
+            }
+            return $returnLink;
+        }
+        $returnLink = $baseUrl . "pages/" . $url;
+        if (!empty($params)) {
+            $returnLink .= "?" . http_build_query($params);
+        }
+        return $returnLink;
     }
 
-    /**
-     * Panel URL'ini al
-     */
-    public function getPanelUrl()
+    public static function buildPanelUrl($url, $params = [])
     {
-        return self::$base_url . "/panel/";
+        $baseUrl = self::baseUrl() . "panel/";
+        if (!empty($params)) {
+            $url .= '?' . http_build_query($params);
+        }
+        return $baseUrl . $url;
     }
 
-    /**
-     * Zorla yönlendirme yap
-     */
-    public function forcedRedirect($url)
+    public function redirect($url)
     {
         echo '<meta http-equiv="refresh" content="0;url=' . $url . '">';
         exit;
-    }
-
-    /**
-     * Header ile yönlendirme yap
-     */
-    public function redirect($path)
-    {
-        header("Location: " . $path);
-        exit;
-    }
-
-    /**
-     * Controller dosya yolunu al
-     */
-    public function controllers($controllerName)
-    {
-        return self::getPanelUrl() . 'controllers/' . rtrim($controllerName, ".php") . ".php";
-    }
-
-    /**
-     * Singleton için clone'lamayı engelle
-     */
-    private function __clone()
-    {
-    }
-
-    /**
-     * Singleton için unserialize'i engelle
-     * @throws Exception
-     */
-    public function __wakeup()
-    {
-        throw new Exception("Cannot unserialize singleton");
     }
 }
 ?>

@@ -1,0 +1,12 @@
+require_once __DIR__ . "/../core/autoloader.php";
+require_once __DIR__ . "/../core/controllerChecker.php";
+
+// Action switch
+switch ($action) {
+    case 'action':
+        break; #
+        default:
+        $session->setFlash('error', "Geçersiz işlem!");
+        $router->redirect(Router::view('panel/giris'));
+        exit;
+        }

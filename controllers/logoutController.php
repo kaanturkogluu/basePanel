@@ -1,9 +1,9 @@
-<?php 
-require_once __DIR__."/../classes/Autoloader.php";
-
-$login  = new MyLogin();
-$login->logout(); 
-
+<?php
+require_once __DIR__ . "/../classes/Session.php";
+require_once __DIR__ . "/../classes/Router.php";
+$session = Session::getInstance();
 $router = Router::getInstance();
-$router->forcedRedirect($router->getBaseUrl(). "panel/login.php");
-?>
+$session->destroy();
+
+$router->redirect(Router::view('giris'))
+    ?>

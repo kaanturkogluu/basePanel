@@ -1,0 +1,3 @@
+# giris URL'sini panel/pages/giris.php'ye yönlendir
+RewriteEngine On
+RewriteRule ^giris$ panel/pages/giris.php [L]

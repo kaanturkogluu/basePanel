@@ -1,5 +1,5 @@
 <?php
-require_once __DIR__."/Router.php";
+require_once __DIR__ . "/Router.php";
 
 class Session
 {
@@ -28,9 +28,16 @@ class Session
         }
 
         $this->lastActivityTime = time();
-        $this->checkSession();
-    }
 
+        // Sadece panel sayfalarında oturum kontrolü yap
+        if (strpos($_SERVER['SCRIPT_NAME'], '/panel/') !== false) {
+            $this->checkSession();
+        }
+    }
+    public function isLoggedIn()
+    {
+        return $this->has('user_id');
+    }
     /**
      * Singleton instance'ı al
      */
@@ -41,43 +48,22 @@ class Session
         }
         return self::$instance;
     }
- 
-    
-    /**
-     * Session kontrolü ve güvenlik önlemleri
-     */
+
     private function checkSession()
     {
-        $router = Router::getInstance();
-        // Session hijacking kontrolü
-        if (isset($_SESSION['_last_ip']) && $_SESSION['_last_ip'] !== $_SERVER['REMOTE_ADDR']) {
-            $this->destroy();
-            self::getInstance();
-            self::setFlash('error','Güvenlik ihlali tespit edildi!');
-            $router->forcedRedirect($router->getPanelUrl().'login.php');
-          
+        if (!$this->checkSessionTimeout()) {
+
+            exit;
         }
 
-        // Session süresi kontrolü
-        if (isset($_SESSION['_last_activity']) && (time() - $_SESSION['_last_activity'] > $this->sessionLifetime)) {
-            $this->destroy();
-            self::getInstance();
-            self::setFlash('error','Oturum Süreniz Doldu');
-            $router->forcedRedirect($router->getPanelUrl().'login.php');
-        }
-
-        // Session ID yenileme
+        // Belirli aralıklarla ID yenile
         if (!isset($_SESSION['_created'])) {
             $_SESSION['_created'] = time();
-        } else if (time() - $_SESSION['_created'] > $this->regenerateTime) {
+        } elseif (time() - $_SESSION['_created'] > $this->regenerateTime) {
             $this->regenerate();
         }
-
-        // Son aktivite zamanını güncelle
-        $_SESSION['_last_activity'] = time();
-        $_SESSION['_last_ip'] = $_SERVER['REMOTE_ADDR'];
+        $this->extendSession();
     }
-
     /**
      * Session ID'yi yenile
      */
@@ -142,7 +128,7 @@ class Session
             setcookie(session_name(), '', time() - 3600, '/');
         }
     }
- 
+
     /**
      * Flash mesaj ata
      */
@@ -151,7 +137,7 @@ class Session
         if (!isset($_SESSION['flash']) || !is_array($_SESSION['flash'])) {
             $_SESSION['flash'] = [];
         }
-        
+
         $_SESSION['flash'][] = [
             'type' => $type,
             'message' => $message
@@ -171,50 +157,7 @@ class Session
         return [];
     }
 
- 
 
-    /**
-     * Kullanıcı girişi yap
-     */
-    public function login($userData)
-    {
-        $this->regenerate();
-        $_SESSION['user'] = $userData;
-        $_SESSION['_last_activity'] = time();
-        $_SESSION['_last_ip'] = $_SERVER['REMOTE_ADDR'];
-    }
-
-    /**
-     * Kullanıcı çıkışı yap
-     */
-    public function logout()
-    {
-        $this->destroy();
-    }
-
-    /**
-     * Kullanıcı giriş yapmış mı kontrol et
-     */
-    public function isLoggedIn()
-    {
-        return isset($_SESSION['user']);
-    }
-
-    /**
-     * Giriş yapmış kullanıcı bilgilerini al
-     */
-    public function getUser()
-    {
-        return $_SESSION['user'] ?? null;
-    }
-
-    /**
-     * Kullanıcı ID'sini al
-     */
-    public function getUserId()
-    {
-        return $_SESSION['user']['id'] ?? null;
-    }
 
     /**
      * Session süresini uzat

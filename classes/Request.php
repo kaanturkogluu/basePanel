@@ -1,14 +1,13 @@
 <?php
-
-require_once __DIR__."/Cleaner.php";
+require_once __DIR__."/Session.php";
 class Request
 {
     private static $instance = null;
-    private $cleaner;
+    private $session;
 
     private function __construct()
     {
-        $this->cleaner = new Cleaner();
+        $this->session = Session::getInstance();
     }
 
     public static function getInstance()
@@ -19,143 +18,62 @@ class Request
         return self::$instance;
     }
 
-    /**
-     * POST verilerini güvenli şekilde alır
-     * @param string|null $key Belirli bir alan için
-     * @param mixed $default Varsayılan değer
-     * @return mixed
-     */
-    public function post($key = null, $default = null)
+    // POST isteği al
+    public function post(string $key, $default = null, string $type = 'string')
     {
-        if ($key === null) {
-            return Cleaner::cleanAll($_POST);
-        }
-        
-        return isset($_POST[$key]) ? Cleaner::cleanAll($_POST[$key]) : $default;
+        $data = $_POST[$key] ?? $default;
+        return $this->sanitize($data, $type);
     }
 
-    /**
-     * GET verilerini güvenli şekilde alır
-     * @param string|null $key Belirli bir alan için
-     * @param mixed $default Varsayılan değer
-     * @return mixed
-     */
-    public function get($key = null, $default = null)
+    // GET isteği al
+    public function get(string $key, $default = null, string $type = 'string')
     {
-        if ($key === null) {
-            return Cleaner::cleanAll($_GET);
-        }
-        
-        return isset($_GET[$key]) ? Cleaner::cleanAll($_GET[$key]) : $default;
+        $data = $_GET[$key] ?? $default;
+        return $this->sanitize($data, $type);
     }
 
-    /**
-     * FILES verilerini güvenli şekilde alır
-     * @param string|null $key Belirli bir alan için
-     * @return mixed
-     */
-    public function files($key = null)
+    // Input sanitize
+    private function sanitize($data, string $type)
     {
-        if ($key === null) {
-            return $_FILES;
-        }
-        
-        return isset($_FILES[$key]) ? $_FILES[$key] : null;
-    }
-
-    /**
-     * Belirli bir POST alanını belirli bir tipte alır
-     * @param string $key Alan adı
-     * @param string $type Veri tipi (string, int, float, email, url, date)
-     * @param mixed $default Varsayılan değer
-     * @return mixed
-     */
-    public function postType($key, $type = 'string', $default = null)
-    {
-        if (!isset($_POST[$key])) {
-            return $default;
+        if (is_array($data)) {
+            return array_map(fn($v) => $this->sanitize($v, $type), $data);
         }
 
-        $value = $_POST[$key];
+        $data = trim($data);
 
+        // XSS önleme (input düzeyi)
+        $data = $this->antiXss($data);
+
+        // Komut enjeksiyon
+        $data = $this->antiCommandInjection($data);
+
+        // Tip kontrolü
         switch ($type) {
             case 'int':
-                return Cleaner::cleanInt($value);
+                return (int)$data;
             case 'float':
-                return Cleaner::cleanFloat($value);
+                return (float)$data;
             case 'email':
-                return Cleaner::cleanEmail($value);
-            case 'url':
-                return Cleaner::cleanURL($value);
-            case 'date':
-                return Cleaner::cleanDate($value);
-            case 'boolean':
-                return Cleaner::cleanBoolean($value);
+                return filter_var($data, FILTER_VALIDATE_EMAIL) ?: null;
             case 'string':
             default:
-                return Cleaner::cleanString($value);
+                return $data;
         }
     }
 
-    /**
-     * Belirli bir GET alanını belirli bir tipte alır
-     * @param string $key Alan adı
-     * @param string $type Veri tipi (string, int, float, email, url, date)
-     * @param mixed $default Varsayılan değer
-     * @return mixed
-     */
-    public function getType($key, $type = 'string', $default = null)
+    // XSS input temizliği (script ve event kaldır)
+    private function antiXss($data)
     {
-        if (!isset($_GET[$key])) {
-            return $default;
-        }
-
-        $value = $_GET[$key];
-
-        switch ($type) {
-            case 'int':
-                return Cleaner::cleanInt($value);
-            case 'float':
-                return Cleaner::cleanFloat($value);
-            case 'email':
-                return Cleaner::cleanEmail($value);
-            case 'url':
-                return Cleaner::cleanURL($value);
-            case 'date':
-                return Cleaner::cleanDate($value);
-            case 'boolean':
-                return Cleaner::cleanBoolean($value);
-            case 'string':
-            default:
-                return Cleaner::cleanString($value);
-        }
+        $data = preg_replace('#<script(.*?)>(.*?)</script>#is', '', $data);
+        $data = preg_replace('/on\w+=".*?"/i', '', $data);
+        return $data;
     }
 
-    /**
-     * POST isteği olup olmadığını kontrol eder
-     * @return bool
-     */
-    public function isPost()
+    // Komut enjeksiyon engelleme
+    private function antiCommandInjection($data)
     {
-        return $_SERVER['REQUEST_METHOD'] === 'POST';
+        return escapeshellcmd($data);
     }
 
-    /**
-     * GET isteği olup olmadığını kontrol eder
-     * @return bool
-     */
-    public function isGet()
-    {
-        return $_SERVER['REQUEST_METHOD'] === 'GET';
-    }
 
-    /**
-     * AJAX isteği olup olmadığını kontrol eder
-     * @return bool
-     */
-    public function isAjax()
-    {
-        return !empty($_SERVER['HTTP_X_REQUESTED_WITH']) && 
-               strtolower($_SERVER['HTTP_X_REQUESTED_WITH']) === 'xmlhttprequest';
-    }
-} 
+}

@@ -1,88 +1,60 @@
 <?php
+/**
+ * Login Controller
+ * Güvenli giriş işlemleri için controller
+ */
 
-require_once __DIR__ . "/../config/controllerValidation.php";
+require_once __DIR__ . "/../core/autoloader.php";
+require_once __DIR__ . "/../core/controllerChecker.php";
 
-
-// Eğer bir class birden fazla alanda kullanılacaksa nesne bu kısımda oluşturlacak
-
-
+// Action switch
 switch ($action) {
-
     case 'login':
-
-     
-      
-
-
-        // ------- Brute Force Koruması --------- //
-
-        $maxDenemeHakki = 4;
-        //Denerken ban yer isen , $bansuersini 100  yap
-        $banSuresi = 1800; // 30 dakika (saniye)
-        $denemeSayisi = $session->get('deneme_sayisi', 0);
-        $sonDenemeZamani = $session->get('son_deneme_vakti', 0);
-        $simdi = time();
-        // Daha önce ban yediyse süresine bak
-        if ($denemeSayisi >= $maxDenemeHakki) {
-            $kalanZaman = $banSuresi - ($simdi - $sonDenemeZamani);
-
-            if ($kalanZaman > 0) {
-                $dakika = ceil($kalanZaman / 60);
-                $session->setFlash('error', "Çok fazla geçersiz deneme yapıldı, {$dakika} dakika sonra tekrar deneyin.");
-                $router->forcedRedirect($router->getPanelUrl() . 'login.php');
-                exit;
-            } else {
-                // Ban süresi doldu, sıfırla
-                $session->remove('deneme_sayisi');
-                $session->remove('son_deneme_vakti');
-                $denemeSayisi = 0;
-            }
+        $myLogin = new MyLogin();
+        $login = $myLogin->checkUser($request->post('username', '', 'string'), $request->post('password', '', 'string'));
+        if ($login == false) {
+            //Yönlendirme kullanıcı yok
+            $router->redirect(Router::view('giris'));
         }
 
-        // Giriş işlemi
-        $login = new MyLogin();
+        switch ($login['role']) {
+            case 'admin':
+                //sessiona veriler alinir , yönlendirme yapılır 
+                $session->set('_login', true);
+                $session->set('_login_type', 'admin');
+                $session->set('user_id', $login['id']);
+                $session->set('full_name', $login['fullname']);
+                $session->set('role', $login['role']);
+                $session->set('ip', $_SERVER['REMOTE_ADDR']);
+                $session->set('ua', $_SERVER['HTTP_USER_AGENT']);
+                $session->extendSession();
+                $router->redirect(Router::view('anasayfa'));
+                break;
 
-        $giris = $login->login($request->post('username'), $request->post('password'));
+            case 'personel':
+                $session->set('_login', true);
+                $session->set('_login_type', 'personel');
+                $session->set('user_id', $login['id']);
+                $session->set('full_name', $login['fullname']);
+                $session->set('role', $login['role']);
+                $session->set('ip', $_SERVER['REMOTE_ADDR']);
+                $session->set('ua', $_SERVER['HTTP_USER_AGENT']);
+                $session->extendSession();
+                $router->redirect(Router::view('anasayfa'));
+                break;
 
-        if ($giris) {
-
-
-            // Log Kaydı
-            $logs = new Logs();
-            $logs->createLog($giris['username'],'login');
-
-            unset($giris['password']);
-            $session->login($giris);
-            $session->remove('deneme_sayisi');
-            $session->remove('son_deneme_vakti');
-            $session->setFlash('success', "Oturum açıldı");
-            $router->forcedRedirect($router->getPanelUrl());
-            exit;
-        } else {
-            // Başarısız giriş -> deneme sayısını artır
-            $denemeSayisi++;
-            $session->set('deneme_sayisi', $denemeSayisi);
-
-            // Eğer ilk başarısız denemeyse, zaman başlat
-            if ($denemeSayisi == 1) {
-                $session->set('son_deneme_vakti', $simdi);
-            }
-
-            $kalanHakk = $maxDenemeHakki - $denemeSayisi;
-            ++$kalanHakk ;
-            $session->setFlash('error', "Hatalı kullanıcı adı veya şifre. Kalan deneme hakkınız: {$kalanHakk}");
-
-            $router->forcedRedirect($router->getBaseUrl() . 'panel/login.php');
-
+            default:
+                $session->setFlash('error', 'Tanımsız Kullanıcı');
+                $router->redirect(Router::view('giris'));
+                break;
         }
-
         break;
 
+   
 
-
+    default:
+        $session->setFlash('error', "Geçersiz işlem!");
+        $router->redirect(Router::view('panel/giris'));
+        exit;
 }
-
-
-
-
-
+?>

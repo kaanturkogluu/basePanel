@@ -1,31 +1,56 @@
 <?php
-require_once __DIR__ . "/BaseModel.php";
-require_once __DIR__ . "/Session.php";
+require_once __DIR__ . '/../core/autoloader.php';
 
-class MyLogin extends BaseModel
+
+class MyLogin
 {
-    protected $table = 'ac_users';
-    protected $primaryKey = 'id';
+    private $session;
+    private $router;
 
+    private $user;
 
-    public function login($username, $password)
+    public function __construct()
     {
-       
-        $user = parent::findAll(['username' => $username], null, 1)[0];
-    
-        if ($user && password_verify($password, $user['password'])) {
-            return $user;
+        $this->session = Session::getInstance();
+        $this->router = Router::getInstance();
+        $this->user = new Users();
+    }
+
+    public function checkUser($username, $password)
+    {
+        // Kullanıcıyı mail ile ara
+        $userData = $this->user->get(['*'], ['mail' => $username]);
+
+        // Kullanıcı yoksa
+        if (!$userData || count($userData) === 0) {
+            $this->session->setFlash('error', 'Kullanıcı bulunamadı');
+            return false;
         }
 
-        return false;
+        // Veritabanından ilk kullanıcı kaydı
+        $user = $userData[0];
+
+        // Şifre doğrulama
+        if (password_verify($password, $user['password'])) {
+            // Başarılı giriş
+            return $userData[0];
+          
+        } else {
+            // Şifre yanlış
+            $this->session->setFlash('error', 'Şifre hatalı');
+            return false;
+        }
     }
 
-   
-    public function logout(){
-        $session = Session::getInstance();
-        $session->logout();
-    }
- 
 
+    public function logout()
+    {
+        $this->session->destroy();
+        $this->router->redirect(Router::view('panel/giris'));
+    }
 }
+
+
+
+
 ?>

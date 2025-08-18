@@ -1,25 +1,16 @@
 <?php
-
-require_once __DIR__."/Session.php";
 class CSRF
 {
     private static $instance = null;
-    private $tokenLength = 32; // Token uzunluğu
-    private $tokenName = 'csrf_token';
+    private $tokenName = '_csrf_token';
+    private $tokenExpire = 3600; // 1 saat
     private $session;
 
-    /**
-     * Singleton için private constructor
-     */
     private function __construct()
     {
         $this->session = Session::getInstance();
-        $this->initializeToken();
     }
 
-    /**
-     * Singleton instance'ı al
-     */
     public static function getInstance()
     {
         if (self::$instance === null) {
@@ -28,133 +19,77 @@ class CSRF
         return self::$instance;
     }
 
-    /**
-     * Token'ı başlat veya yenile
-     */
-    private function initializeToken()
+    // Token üret
+    public function generateToken()
     {
-        if (!$this->session->has($this->tokenName)) {
-            $this->regenerateToken();
-        }
-    }
-
-    /**
-     * Yeni token oluştur
-     */
-    private function regenerateToken()
-    {
-        $token = $this->generateToken();
-        $this->session->set($this->tokenName, $token);
+        $token = bin2hex(random_bytes(32));
+        $this->session->set($this->tokenName, [
+            'value' => $token,
+            'time'  => time()
+        ]);
         return $token;
     }
 
-    /**
-     * Güvenli token oluştur
-     */
-    private function generateToken()
+    // HTML input
+    public function getTokenInputField()
     {
-        return bin2hex(random_bytes($this->tokenLength));
+        $token = $this->generateToken();
+        return '<input type="hidden" name="'.$this->tokenName.'" value="'.$token.'">';
     }
 
-    /**
-     * Mevcut token'ı al
-     */
-    public function getToken()
-    {
-        return $this->session->get($this->tokenName);
-    }
-
-    /**
-     * Token'ı yenile
-     */
-    public function refreshToken()
-    {
-        return $this->regenerateToken();
-    }
-
-    /**
-     * Token doğrula
-     */
-    public function validateToken($token)
-    {
-        if (empty($token)) {
-            return false;
-        }
-
-        $storedToken = $this->getToken();
-        if (empty($storedToken)) {
-            return false;
-        }
-
-        return hash_equals($storedToken, $token);
-    }
-
-    /**
-     * Form için hidden input oluştur
-     */
-    public function getTokenField()
-    {
-        $token = $this->getToken();
-        return '<input type="hidden" name="' . $this->tokenName . '" value="' . htmlspecialchars($token) . '">';
-    }
-
-    /**
-     * POST isteğindeki token'ı doğrula
-     */
-    public function validateRequest()
-    {
-        if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-            $token = $_POST[$this->tokenName] ?? null;
-            if (!$this->validateToken($token)) {
-                throw new Exception('CSRF token doğrulaması başarısız!');
-            }
-        }
-    }
-
-    /**
-     * AJAX isteği için token header'ı oluştur
-     */
+    // Header token (AJAX için)
     public function getTokenHeader()
     {
-        return 'X-CSRF-Token: ' . $this->getToken();
+        return $this->generateToken();
     }
 
-    /**
-     * AJAX isteğindeki token'ı doğrula
-     */
+    // Token doğrula (form veya header)
+    public function validateToken($token)
+    {
+        $sessionToken = $this->session->get($this->tokenName);
+
+        if (!$sessionToken) {
+            return false;
+        }
+
+        if (time() - $sessionToken['time'] > $this->tokenExpire) {
+            $this->session->remove($this->tokenName);
+            return false;
+        }
+
+        if (hash_equals($sessionToken['value'], $token)) {
+            $this->session->remove($this->tokenName); // Tek kullanımlık
+            return true;
+        }
+
+        return false;
+    }
+
+    // AJAX isteğini doğrula
     public function validateAjaxRequest()
     {
-        $headers = getallheaders();
+        $headers = $this->getRequestHeaders();
         $token = $headers['X-CSRF-Token'] ?? null;
-        
-        if (!$this->validateToken($token)) {
-            http_response_code(403);
-            echo json_encode(['error' => 'CSRF token doğrulaması başarısız!']);
-            exit;
+        return $this->validateToken($token);
+    }
+
+    // Doğrudan form doğrulama (POST üzerinden)
+    public function validateFormRequest()
+    {
+        $token = $_POST[$this->tokenName] ?? null;
+        return $this->validateToken($token);
+    }
+
+    // HTTP header’larını al (case insensitive)
+    private function getRequestHeaders()
+    {
+        $headers = [];
+        foreach ($_SERVER as $key => $value) {
+            if (str_starts_with($key, 'HTTP_')) {
+                $headerName = str_replace(' ', '-', ucwords(strtolower(str_replace('_', ' ', substr($key, 5)))));
+                $headers[$headerName] = $value;
+            }
         }
+        return $headers;
     }
-
-    /**
-     * Token'ı temizle
-     */
-    public function clearToken()
-    {
-        $this->session->remove($this->tokenName);
-    }
-
-    /**
-     * Singleton için clone'lamayı engelle
-     */
-    private function __clone()
-    {
-    }
-
-    /**
-     * Singleton için unserialize'i engelle
-     * @throws Exception
-     */
-    public function __wakeup()
-    {
-        throw new Exception("Cannot unserialize singleton");
-    }
-} 
+}
