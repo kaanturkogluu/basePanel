@@ -4,7 +4,7 @@ require_once __DIR__ . "/Router.php";
 class Session
 {
     private static $instance = null;
-    private $sessionLifetime = 900; // 15 dakika (saniye cinsinden)
+    private $sessionLifetime = 5; // 15 dakika (saniye cinsinden)
     private $regenerateTime = 300; // 5 dakikada bir session ID yenileme
     private $lastActivityTime;
 
@@ -29,10 +29,8 @@ class Session
 
         $this->lastActivityTime = time();
 
-        // Sadece panel sayfalarında oturum kontrolü yap
-        if (strpos($_SERVER['SCRIPT_NAME'], '/panel/') !== false) {
-            $this->checkSession();
-        }
+        // Tüm sayfalarda session kontrolü yap
+        $this->checkSession();
     }
     public function isLoggedIn()
     {
@@ -51,9 +49,19 @@ class Session
 
     private function checkSession()
     {
+        // Session timeout kontrolü
         if (!$this->checkSessionTimeout()) {
-
-            exit;
+            // Session süresi dolmuş, login sayfasına yönlendir
+            if (isset($_SERVER['HTTP_X_REQUESTED_WITH']) && $_SERVER['HTTP_X_REQUESTED_WITH'] === 'XMLHttpRequest') {
+                // AJAX isteği ise JSON response döndür
+                header('Content-Type: application/json');
+                echo json_encode(['success' => false, 'message' => 'Session expired', 'redirect' => 'login']);
+                exit;
+            } else {
+                // Normal sayfa isteği ise login'e yönlendir
+                header('Location: ' . Router::baseUrl() . 'pages/giris.php');
+                exit;
+            }
         }
 
         // Belirli aralıklarla ID yenile
@@ -62,6 +70,8 @@ class Session
         } elseif (time() - $_SESSION['_created'] > $this->regenerateTime) {
             $this->regenerate();
         }
+        
+        // Her sayfa yüklendiğinde session süresini uzat
         $this->extendSession();
     }
     /**
@@ -79,6 +89,7 @@ class Session
     public function set($key, $value)
     {
         $_SESSION[$key] = $value;
+        $_SESSION['_last_activity'] = time(); // Activity timestamp güncelle
     }
 
     /**
@@ -122,11 +133,19 @@ class Session
      */
     public function destroy()
     {
-        $this->clear();
-        session_destroy();
+        // Session aktif mi kontrol et
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            $this->clear();
+            session_destroy();
+        }
+        
+        // Cookie'yi temizle
         if (isset($_COOKIE[session_name()])) {
             setcookie(session_name(), '', time() - 3600, '/');
         }
+        
+        // Session array'ini temizle
+        $_SESSION = [];
     }
 
     /**
@@ -173,7 +192,15 @@ class Session
     public function checkSessionTimeout()
     {
         if (isset($_SESSION['_last_activity']) && (time() - $_SESSION['_last_activity'] > $this->sessionLifetime)) {
-            $this->destroy();
+            // Session timeout - mesajı cookie'ye kaydet
+            setcookie('session_timeout_message', 'Oturum süresi doldu. Lütfen tekrar giriş yapın.', time() + 60, '/', '', false, true);
+            setcookie('session_timeout_type', 'warning', time() + 60, '/', '', false, true);
+            
+            // Session verilerini temizle
+            $_SESSION = [];
+            if (isset($_COOKIE[session_name()])) {
+                setcookie(session_name(), '', time() - 3600, '/');
+            }
             return false;
         }
         return true;

@@ -7,6 +7,11 @@
 require_once __DIR__ . "/../core/autoloader.php";
 require_once __DIR__ . "/../core/controllerChecker.php";
 
+if (!RateLimiter::checkLimit('login_attempts', $request->post('username'))) {
+    $session->setFlash('error', 'Çok fazla giriş denemesi. Lütfen bekleyin.');
+    $router->redirect(Router::view('giris'));
+    exit;
+}
 // Action switch
 switch ($action) {
     case 'login':

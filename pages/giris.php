@@ -4,16 +4,34 @@ require_once __DIR__ . '/../core/autoloader.php';
 // Session instance'ı oluştur
 $session = Session::getInstance();
 
+// Session timeout mesajını cookie'den al
+$sessionTimeoutMessage = null;
+$sessionTimeoutType = null;
+if (isset($_COOKIE['session_timeout_message'])) {
+    $sessionTimeoutMessage = $_COOKIE['session_timeout_message'];
+    $sessionTimeoutType = $_COOKIE['session_timeout_type'] ?? 'warning';
+    
+    // Cookie'leri temizle
+    setcookie('session_timeout_message', '', time() - 3600, '/');
+    setcookie('session_timeout_type', '', time() - 3600, '/');
+}
+
 // Flash mesajları al
 $errors = $session->getFlash();
+
+// Session timeout mesajını flash message olarak ekle
+if ($sessionTimeoutMessage) {
+    $errors[] = [
+        'type' => $sessionTimeoutType,
+        'message' => $sessionTimeoutMessage
+    ];
+}
 
 // Notifications include et (session artık mevcut)
 require_once __DIR__ . '/../template/notifications.php';
 
 $router = Router::getInstance();
 $csrf = CSRF::getInstance();
-
- 
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -180,6 +198,79 @@ $csrf = CSRF::getInstance();
             color: #5D87FF;
         }
 
+        /* Flash Message Styles */
+        .alert {
+            border: none;
+            border-radius: 10px;
+            padding: 15px 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            position: relative;
+        }
+
+        .alert-success {
+            background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+            color: #155724;
+            border-left: 4px solid #28a745;
+        }
+
+        .alert-warning {
+            background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+            color: #856404;
+            border-left: 4px solid #ffc107;
+        }
+
+        .alert-danger {
+            background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%);
+            color: #721c24;
+            border-left: 4px solid #dc3545;
+        }
+
+        .alert-info {
+            background: linear-gradient(135deg, #d1ecf1 0%, #bee5eb 100%);
+            color: #0c5460;
+            border-left: 4px solid #17a2b8;
+        }
+
+        .alert i {
+            font-size: 1.1rem;
+        }
+
+        .alert strong {
+            font-weight: 600;
+        }
+
+        .btn-close {
+            position: absolute;
+            top: 10px;
+            right: 15px;
+            opacity: 0.7;
+            transition: opacity 0.3s;
+        }
+
+        .btn-close:hover {
+            opacity: 1;
+        }
+
+        /* Session Timeout Specific */
+        .alert-warning.session-timeout {
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% {
+                transform: scale(1);
+            }
+
+            50% {
+                transform: scale(1.02);
+            }
+
+            100% {
+                transform: scale(1);
+            }
+        }
+
         img {
             mix-blend-mode: exclusion;
         }
@@ -253,12 +344,46 @@ $csrf = CSRF::getInstance();
                                     ?>
                                     <?php
                                     if (!empty($errors)) {
-
                                         foreach ($errors as $e) {
-                                            ?>
-                                            <p class="alert alert-danger"><?= $e['message'] ?></p>
-                                            <?php
+                                            $alertClass = 'danger';
+                                            $icon = 'fas fa-exclamation-triangle';
 
+                                            // Message type'a göre stil belirle
+                                            if (isset($e['type'])) {
+                                                switch ($e['type']) {
+                                                    case 'success':
+                                                        $alertClass = 'success';
+                                                        $icon = 'fas fa-check-circle';
+                                                        break;
+                                                    case 'warning':
+                                                        $alertClass = 'warning';
+                                                        $icon = 'fas fa-exclamation-triangle';
+                                                        break;
+                                                    case 'info':
+                                                        $alertClass = 'info';
+                                                        $icon = 'fas fa-info-circle';
+                                                        break;
+                                                    default:
+                                                        $alertClass = 'danger';
+                                                        $icon = 'fas fa-exclamation-triangle';
+                                                }
+                                            }
+
+                                            // Session timeout mesajı için özel class
+                                            $additionalClass = '';
+                                            if (isset($e['message']) && strpos($e['message'], 'Oturum süresi doldu') !== false) {
+                                                $additionalClass = ' session-timeout';
+                                            }
+                                            ?>
+                                            <div class="alert alert-<?= $alertClass ?> alert-dismissible fade show<?= $additionalClass ?>"
+                                                role="alert">
+                                                <i class="<?= $icon ?> me-2"></i>
+                                                <strong><?= ucfirst($e['type'] == 'warning' ? 'Uyarı' : 'Hata') ?>:</strong>
+                                                <?= htmlspecialchars($e['message']) ?>
+                                                <button type="button" class="btn-close" data-bs-dismiss="alert"
+                                                    aria-label="Close"></button>
+                                            </div>
+                                            <?php
                                         }
                                     }
                                     ?>

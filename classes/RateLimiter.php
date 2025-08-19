@@ -167,7 +167,7 @@ class RateLimiter
     public function clearRequests($type, $identifier = null)
     {
         $identifier = $identifier ?: $this->getDefaultIdentifier();
-        $this->session->delete("rate_limit_{$type}_{$identifier}");
+        $this->session->remove("rate_limit_{$type}_{$identifier}");
     }
     
     /**

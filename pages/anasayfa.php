@@ -1,10 +1,9 @@
-<?php   
-require_once __DIR__.'/../template/template.php';
+<?php
+require_once __DIR__ . '/../template/template.php';
 
 
- 
-echo "<pre>";
-print_r($_SESSION);
+
+
 ?>
 <div class="dashboard-content">
     <!-- Stats Cards -->
@@ -207,5 +206,5 @@ print_r($_SESSION);
     </div>
 </div>
 <?php
-require_once __DIR__.'/../template/footer.php';
+require_once __DIR__ . '/../template/footer.php';
 ?>
