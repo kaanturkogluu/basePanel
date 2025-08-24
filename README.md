@@ -50,7 +50,7 @@ Modern, güvenli ve performanslı PHP web uygulama framework'ü.
 ### Kurulum Adımları
 ```bash
 # Repository'yi klonlayın
-git clone https://github.com/your-repo/motor.git
+git clone https://github.com/kaanturkogluu/basePanel.git
 
 # Proje dizinine gidin
 cd motor
