@@ -19,7 +19,7 @@ class MyLogin
     public function checkUser($username, $password)
     {
         // Kullanıcıyı mail ile ara
-        $userData = $this->user->get(['*'], ['mail' => $username]);
+        $userData = $this->user->get(['*'], ['user_name' => $username]);
 
         // Kullanıcı yoksa
         if (!$userData || count($userData) === 0) {

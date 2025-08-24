@@ -33,7 +33,15 @@ class CSRF
     // HTML input
     public function getTokenInputField()
     {
-        $token = $this->generateToken();
+        // Eğer session'da geçerli token varsa onu kullan, yoksa yeni üret
+        $existingToken = $this->session->get($this->tokenName);
+        
+        if ($existingToken && (time() - $existingToken['time']) < $this->tokenExpire) {
+            $token = $existingToken['value'];
+        } else {
+            $token = $this->generateToken();
+        }
+        
         return '<input type="hidden" name="'.$this->tokenName.'" value="'.$token.'">';
     }
 
@@ -58,7 +66,7 @@ class CSRF
         }
 
         if (hash_equals($sessionToken['value'], $token)) {
-            $this->session->remove($this->tokenName); // Tek kullanımlık
+            // Token'ı hemen silme, request tamamlandıktan sonra sil
             return true;
         }
 

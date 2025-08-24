@@ -4,7 +4,7 @@ require_once __DIR__ . "/Router.php";
 class Session
 {
     private static $instance = null;
-    private $sessionLifetime = 5; // 15 dakika (saniye cinsinden)
+    private $sessionLifetime = 600; // 15 dakika (saniye cinsinden)
     private $regenerateTime = 300; // 5 dakikada bir session ID yenileme
     private $lastActivityTime;
 
