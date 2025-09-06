@@ -35,7 +35,7 @@ $GLOBALS['app_config'] = [
     'session_lifetime' => 120,
     'websocket_port' => 8080, // WebSocket sunucusu için port numarası
     'livechat' => false,// chat aktif olacak mı ?
-    'base_file_name' => 'motor', 
+    'base_file_name' => '', 
     'base_panel_folder_name'=>''// panelin olduğu dosya adi
 ];
 
